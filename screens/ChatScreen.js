@@ -1,82 +1,163 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, SafeAreaView, FlatList, Image, StyleSheet, StatusBar } from 'react-native';
-import { Appbar } from 'react-native-paper';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, FlatList, Image, StyleSheet, StatusBar } from 'react-native';
+import { Appbar, Avatar } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
+import images from '../utils/Images';
+import { collection, orderBy, query, onSnapshot, serverTimestamp, setDoc, doc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, database } from '../config/firebase';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const ChatScreen = ({ route }) => {
   const navigation = useNavigation();
-  const { chatId, username, profilePicture } = route.params;
-  const [message, setMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const { chatRoomId, username, profilePicture } = route.params;
+  const [message, setMessage] = useState("");
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState("");
+  const flatListRef = useRef(null);
 
   useEffect(() => {
-    const randomChatData = [
-      { message: 'Hi there!', sender: 'You' },
-      { message: 'Hello! How are you?', sender: username },
-    ];
-    setChatHistory(randomChatData);
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUserId(user.uid);
+      } else {
+        setCurrentUserId("");
+      }
+    });
+    return unsubscribeAuth;
   }, []);
 
-  const sendMessage = () => {
-    if (!message) return;
-    setChatHistory([...chatHistory, { message, sender: 'You' }]);
+  useLayoutEffect(() => {
+    const collectionRef = collection(database, chatRoomId);
+    const q = query(collectionRef, orderBy('createdAt', 'asc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const messagesData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        createdAt: doc.data().createdAt?.toDate(),
+        text: doc.data().text,
+        user: doc.data().user
+      }));
+      setMessages(messagesData);
+    });
+
+    return () => unsubscribe();
+  }, [chatRoomId]);
+
+  const onSend = (text) => {
+    if (text === "" || currentUserId === "") return;
     setMessage('');
+    const newMessage = {
+      createdAt: serverTimestamp(),
+      text: text,
+      user: currentUserId
+    };
+    const collectionRef = collection(database, chatRoomId);
+    const docRef = doc(collectionRef);
+    setDoc(docRef, newMessage)
+      .then(() => {
+        const chatsCollectionRef = collection(database, 'chats');
+        const chatsDocRef = doc(chatsCollectionRef, chatRoomId);
+        setDoc(chatsDocRef, { lastUpdatedAt: serverTimestamp() })
+          .catch((error) => {
+            console.error(error);
+          });
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  };
+
+  const sendMessage = () => {
+    if (message.trim()) onSend(message.trim());
+  };
+
+  const SendButton = ({ onPress, disabled }) => {
+    const opacity = disabled ? 0.5 : 1;
+  
+    return (
+      <TouchableOpacity
+        style={[styles.button, { opacity }]}
+        onPress={onPress}
+        disabled={disabled}
+      >
+        <MaterialIcons name="send" size={30} color="black" />
+      </TouchableOpacity>
+    );
+  };
+
+  const Toolbar = () => {
+    return (
+      <Appbar.Header style={[styles.appbar, { backgroundColor: '#121212' }]}>
+        <Appbar.Action icon="arrow-left" onPress={() => navigation.navigate("Chats")} color="white" />
+        <Avatar.Image size={40} source={images.profile2} style={{ marginHorizontal: 10 }} />
+        <Appbar.Content title={username} titleStyle={{ fontWeight: 'bold', fontSize: 20, color: '#00E1C5' }} />
+      </Appbar.Header>
+    );
   };
 
   const renderChatItem = ({ item }) => {
-    const isYou = item.sender === 'You';
-    const backgroundColor = isYou ? '#333' : '#ddd'; // Darker shade for You, lighter for others
-    const textColor = isYou ? '#fff' : '#000'; // White text for You, black for others
+    const isYou = item.user === currentUserId;
+    const createdTime = item.createdAt ? item.createdAt.toLocaleString() : '';
+    const backgroundColor = isYou ? '#283540' : '#0A433D';
+    const textColor = '#fff';
     const containerStyle = {
       flexDirection: 'row',
-      alignItems: 'flex-start',
-      padding: 10,
+      alignItems: 'center',
+      paddingHorizontal: 15,
+      paddingVertical: 5,
       backgroundColor,
       borderRadius: 10,
-      maxWidth: '80%', // Limit horizontal width to 80%
-      alignSelf: isYou ? 'flex-end' : 'flex-start', // Align messages based on sender
-      marginRight: isYou ? 10 : 25, // Margin for better spacing
+      maxWidth: '80%',
+      alignSelf: isYou ? 'flex-end' : 'flex-start',
+      marginRight: isYou ? 10 : 25,
       marginLeft: isYou ? 25 : 10,
-      marginVertical: 5
+      marginTop: 8
     };
 
     return (
       <View style={containerStyle}>
-        {isYou ? null : (
-          <Image source={profilePicture} style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }} />
-        )}
-        <View style={{ flex: 1 }}> 
-          <Text style={{ fontWeight: 'bold', color: textColor }}>{item.sender}</Text>
-          <Text style={{ color: textColor }}>{item.message}</Text>
+        {/* {isYou ? null : (
+          <Image source={images.profile2} style={{ width: 50, height: 50, borderRadius: 20, marginRight: 10 }} />
+        )} */}
+        <View>
+          {/* <Text style={{ fontWeight: 'bold', color: textColor }}>{isYou ? "You" : username}</Text> */}
+          <Text style={{ color: textColor }}>{item.text}</Text>
+          {createdTime ? (
+            <Text style={{ color: '#FFFFFF88', fontSize: 8, textAlign: 'right', paddingVertical: 4 }}>
+              {createdTime}
+            </Text>
+          ) : null}
         </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#171E26' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#121212' }}>
       <StatusBar barStyle="light-content" />
-      <Appbar.Header style={[styles.appbar, { backgroundColor: '#171E26' }]}>
-        <Appbar.Action icon="arrow-left" onPress={() => navigation.goBack()} color="white" />
-        <Appbar.Content title={username} titleStyle={{ fontWeight: 'bold', fontSize: 20, color: '#00E1C5' }} />
-      </Appbar.Header>
+      <Toolbar />
       <View style={styles.separator}></View>
+
       <FlatList
-        data={chatHistory}
+        ref={flatListRef}
+        data={messages}
         renderItem={renderChatItem}
-        keyExtractor={(item) => item.message}
+        keyExtractor={(item) => item.id}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: 10 }}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, backgroundColor: '#eee' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, backgroundColor: '#121212' }}>
         <TextInput
           value={message}
           onChangeText={setMessage}
           placeholder="Type a message..."
-          style={{ flex: 1, paddingHorizontal: 10 }}
+          placeholderTextColor={"#aaa"}
+          style={styles.input}
         />
-        <Button title="Send" onPress={sendMessage} disabled={!message} />
+        <SendButton onPress={sendMessage} disabled={!message} />
       </View>
     </SafeAreaView>
   );
@@ -90,7 +171,33 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#FFFFFF66',
+  },
+  button: {
+    backgroundColor: '#00E1C5', // You can customize the color here
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+  },
+  buttonText: {
+    color: 'black',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  input: {
+    backgroundColor: '#FFFFFF11',
+    flex: 1,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginEnd: 10,
+    borderRadius: 25,
+    color: 'white',
+    borderWidth: 1,
+    borderColor: '#FFFFFF66',
   },
 });
 

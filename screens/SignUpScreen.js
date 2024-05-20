@@ -1,159 +1,284 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet, Image, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet, Image, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import Toast from 'react-native-toast-message';
-import { auth } from '../FirebaseConfig.js';
+import { auth } from '../config/firebase.js';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { useNavigation } from '@react-navigation/native';
+import { collection, doc, setDoc } from 'firebase/firestore';
+import { database } from '../config/firebase.js';
+
+const addUser = async (userId, name, email, image) => {
+  const newUser = {
+    name: name,
+    email: email,
+    image: image,
+  };
+  const collectionRef = collection(database, 'users');
+  const docRef = doc(collectionRef, userId || undefined);
+  setDoc(docRef, newUser)
+    .then(() => {
+      console.log("Data written successfully");
+    })
+    .catch((error) => {
+      console.error('Error adding document:', error);
+    });
+};
 
 const SignUpScreen = ({ navigation }) => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [passwordVisible, setPasswordVisible] = useState(false);
-    // const navigation = useNavigation();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [isFocused, setIsFocused] = useState({ name: false, email: false, password: false, confirmPassword: false });
+  const [error, setError] = useState(false);
 
-    const handleRegister = () => {
-      if (password !== confirmPassword) {
+  const handleRegister = () => {
+    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
+      setError(true);
+      Toast.show({
+        type: 'error',
+        text1: 'Incomplete Info',
+        text2: 'Please fill all fields',
+        visibilityTime: 3000,
+        autoHide: true,
+        bottomOffset: 30,
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError(true);
+      Toast.show({
+        type: 'error',
+        text1: 'Password Confirmation Unsuccessful',
+        text2: 'Password and Confirm Password must be same',
+        visibilityTime: 3000,
+        autoHide: true,
+        bottomOffset: 30,
+      });
+      return;
+    }
+  
+    createUserWithEmailAndPassword(auth, email, password)
+      .then(async (userCredential) => {
+        const user = userCredential.user;
+        await addUser(user.uid, name, email, "");
+        setError(false);
+        // navigation.navigate('Login');
+      })
+      .catch((error) => {
+        console.log(error.message);
+        setError(true);
         Toast.show({
           type: 'error',
-          text1: 'Password Confirmation Unsuccessful',
-          text2: 'Password and Confirm Password must be same',
+          text1: 'Registration Failed',
+          text2: error.message,
           visibilityTime: 3000,
           autoHide: true,
           bottomOffset: 30,
         });
-        return
-      }
-  
-      createUserWithEmailAndPassword(auth, email, password)
-        .then((userCredential) => {
-          Alert.alert("Message", "Successfully created user with email and password.");
-          navigation.navigate('Chats')
-        })
-        .catch((error) => {
-          //  Alert.alert("Error", error.message);
-          console.log(error.message);
-        });
-    };
-  
-    return (
-      <View style={[styles.container, { backgroundColor: '#171E26' }]}>
+      });
+  };
+
+  const handleFocus = (field) => {
+    setIsFocused({ ...isFocused, [field]: true });
+    setError(false);
+  };
+
+  const handleBlur = (field) => {
+    setIsFocused({ ...isFocused, [field]: false });
+  };
+
+  return (
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+      keyboardVerticalOffset={90}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         <StatusBar barStyle="light-content" />
         <Image source={require('../assets/logo.png')} style={styles.logo} />
-        <Text style={[styles.title, { color: '#00E1C5' }]}>Sign Up</Text>
-        {/* <TextInput
-          style={styles.input}
-          placeholder="Username"
-          placeholderTextColor="#999"
-        /> */}
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholderTextColor="#999"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <View style={styles.passwordContainer}>
+        <Text style={styles.appName}>ChatLife</Text>
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, error ? styles.labelError : isFocused.name ? styles.labelFocused : null]}>
+            Username
+          </Text>
           <TextInput
-            style={styles.passwordInput}
-            placeholder="Password"
-            autoCapitalize="none"
-            placeholderTextColor="#999"
-            secureTextEntry={!passwordVisible}
-            value={password}
-            onChangeText={setPassword}
+            style={[styles.input, error ? styles.inputError : isFocused.name ? styles.inputFocused : null]}
+            placeholder="Enter your Username"
+            placeholderTextColor="#FFFFFF66"
+            value={name}
+            onChangeText={setName}
+            onFocus={() => handleFocus('name')}
+            onBlur={() => handleBlur('name')}
           />
-          <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
-            <Icon name={passwordVisible ? 'eye-slash' : 'eye'} size={20} color="#999" style={styles.eyeIcon} />
-          </TouchableOpacity>
         </View>
-        <View style={styles.passwordContainer}>
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, error ? styles.labelError : isFocused.email ? styles.labelFocused : null]}>
+            Email
+          </Text>
           <TextInput
-            style={styles.passwordInput}
-            placeholder="Confirm Password"
+            style={[styles.input, error ? styles.inputError : isFocused.email ? styles.inputFocused : null]}
+            placeholder="Enter your Email"
+            placeholderTextColor="#FFFFFF66"
             autoCapitalize="none"
-            placeholderTextColor="#999"
-            secureTextEntry={!passwordVisible}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+            onFocus={() => handleFocus('email')}
+            onBlur={() => handleBlur('email')}
           />
-          <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
-            <Icon name={passwordVisible ? 'eye-slash' : 'eye'} size={20} color="#999" style={styles.eyeIcon} />
-          </TouchableOpacity>
+        </View>
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, error ? styles.labelError : isFocused.password ? styles.labelFocused : null]}>
+            Password
+          </Text>
+          <View style={[
+            styles.passwordContainer, 
+            error ? styles.inputError : isFocused.password ? styles.inputFocused : null
+          ]}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Atleast 6 characters"
+              placeholderTextColor="#FFFFFF66"
+              autoCapitalize="none"
+              secureTextEntry={!passwordVisible}
+              value={password}
+              onChangeText={setPassword}
+              onFocus={() => handleFocus('password')}
+              onBlur={() => handleBlur('password')}
+            />
+            <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
+              <Icon name={passwordVisible ? 'eye-slash' : 'eye'} size={14} color="#00E1C5" style={styles.eyeIcon} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, error ? styles.labelError : isFocused.confirmPassword ? styles.labelFocused : null]}>
+            Confirm Password
+          </Text>
+          <View style={[
+            styles.passwordContainer, 
+            error ? styles.inputError : isFocused.confirmPassword ? styles.inputFocused : null
+          ]}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Atleast 6 characters"
+              placeholderTextColor="#FFFFFF66"
+              autoCapitalize="none"
+              secureTextEntry={!passwordVisible}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              onFocus={() => handleFocus('confirmPassword')}
+              onBlur={() => handleBlur('confirmPassword')}
+            />
+            <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
+              <Icon name={passwordVisible ? 'eye-slash' : 'eye'} size={14} color="#00E1C5" style={styles.eyeIcon} />
+            </TouchableOpacity>
+          </View>
         </View>
         <TouchableOpacity style={styles.button} onPress={handleRegister}>
           <Text style={styles.buttonText}>Sign Up</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.textLink}>
-          <Text style={styles.linkText}>Already have an account? Log In</Text>
+          <Text style={styles.linkText}>Already have an account?</Text>
+          <Text style={[styles.linkText, {color: "#00E1C5", paddingStart: 5}]}>Log In</Text>
         </TouchableOpacity>
         <Toast ref={(ref) => Toast.setRef(ref)} />
-      </View>
-    );
-  };
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+};
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 20,
-    },
-    title: {
-      fontSize: 32,
-      fontWeight: 'bold',
-      marginBottom: 20,
-    },
-    input: {
-      backgroundColor: '#2C3848',
-      width: '100%',
-      padding: 15,
-      marginBottom: 20,
-      borderRadius: 5,
-      color: 'white',
-    },
-    button: {
-      backgroundColor: '#00E1C5',
-      width: '100%',
-      padding: 15,
-      alignItems: 'center',
-      borderRadius: 5,
-    },
-    buttonText: {
-      color: 'white',
-      fontWeight: 'bold',
-    },
-    textLink: {
-      marginTop: 10,
-    },
-    linkText: {
-      color: 'white',
-      textAlign: 'center',
-    },
-    passwordContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#2C3848',
-      width: '100%',
-      borderRadius: 5,
-      marginBottom: 20,
-    },
-    passwordInput: {
-      flex: 1,
-      padding: 15,
-      color: 'white',
-    },
-    eyeIcon: {
-      padding: 15,
-    },
-    logo: {
-      width: 100,
-      height: 100,
-      marginBottom: 20,
-    },
-  });
+const styles = StyleSheet.create({
+  scrollContainer: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: '#121212',
+  },
+  appName: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#00E1C5',
+    marginBottom: 20,
+  },
+  inputContainer: {
+    width: '100%',
+    marginBottom: 25,
+  },
+  label: {
+    left: 5,
+    top: -5,
+    color: 'white',
+    fontSize: 14,
+  },
+  labelFocused: {
+    color: '#00E1C5',
+  },
+  labelError: {
+    color: '#E02424',
+  },
+  input: {
+    backgroundColor: '#FFFFFF11',
+    width: '100%',
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+    borderRadius: 5,
+    color: 'white',
+    borderWidth: 1,
+    borderColor: '#FFFFFF66',
+  },
+  inputFocused: {
+    borderColor: '#00E1C5',
+  },
+  inputError: {
+    borderColor: '#E02424',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF11',
+    width: '100%',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#FFFFFF66',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+    color: 'white',
+  },
+  eyeIcon: {
+    paddingHorizontal: 15,
+  },
+  button: {
+    backgroundColor: '#00E1C5',
+    width: '100%',
+    padding: 15,
+    alignItems: 'center',
+    borderRadius: 5,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  textLink: {
+    flexDirection: 'row',
+    marginTop: 20,
+  },
+  linkText: {
+    color: 'white',
+    textAlign: 'center',
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+  },
+});
 
-  export default SignUpScreen;
+export default SignUpScreen;
