@@ -188,15 +188,15 @@ const ChatListScreen = () => {
       <StatusBar barStyle="light-content" />
       <Appbar.Header style={[styles.appbar, { backgroundColor: '#121212' }]}>
         <Appbar.Content title="Chats" titleStyle={{ fontWeight: 'bold', fontSize: 24, color: '#00E1C5' }} />
-        {/* <Appbar.Action icon="magnify" onPress={handleSeachVisibility} color="white" /> */}
-        {/* <Appbar.Action icon={<MaterialCommunityIcons name="settings" size={24} color="white" />} onPress={handleMenuPress} /> */}
-        <Menu
+        <Appbar.Action icon="dots-vertical" onPress={() => navigation.navigate("Settings")} color="white" />
+        {/* <Appbar.Action icon={<MaterialCommunityIcons name="settings" size={24} color="white" />} onPress={() => navigation.navigate("Settings")} /> */}
+        {/* <Menu
           visible={menuVisible}
           onDismiss={closeMenu}
           anchor={<Appbar.Action icon="dots-vertical" onPress={handleMenuPress} color="white" />}
         >
           <Menu.Item onPress={handleLogout} title="Logout" />
-        </Menu>
+        </Menu> */}
       </Appbar.Header>
       {/* {searchVisible ? <TextInput
         placeholder="Search by email"

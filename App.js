@@ -7,6 +7,7 @@ import SignUpScreen from './screens/SignUpScreen';
 import ChatScreen from './screens/ChatScreen';
 import ChatListScreen from './screens/ChatListScreen';
 import AddContactScreen from './screens/AddContactScreen';
+import SettingsScreen from './screens/SettingsScreen.js';
 import { AppRegistry } from 'react-native';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -34,6 +35,7 @@ function ChatStack() {
       <Stack.Screen name="Chats" component={ChatListScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ChatScreen" component={ChatScreen} options={{ headerShown: false }} />
       <Stack.Screen name="AddContactScreen" component={AddContactScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
