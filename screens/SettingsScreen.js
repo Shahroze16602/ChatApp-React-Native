@@ -11,6 +11,7 @@ import { Appbar } from 'react-native-paper';
 
 const SettingsScreen = ({ route }) => {
   const navigation = useNavigation();
+    const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
     const [newUsername, setNewUsername] = useState('');
     const [currentPassword, setCurrentPassword] = useState('');
@@ -58,6 +59,7 @@ const SettingsScreen = ({ route }) => {
             if (user.exists) {
                 const userData = user.data();
                 setUsername(userData.name); // Assuming "name" field stores the username
+                setEmail(userData.email);
             } else {
                 console.error('User document not found in database');
             }
@@ -205,6 +207,7 @@ const SettingsScreen = ({ route }) => {
                             <Icon name="edit" size={12} color="white" style={{ padding: 4 }} />
                         </TouchableOpacity>
                     </View>
+                    <Text style={styles.email}>{email}</Text>
                 </View>
                 <TouchableOpacity
                     style={[styles.button, { marginTop: 220 }]}
@@ -383,6 +386,12 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: 'bold',
         fontSize: 18,
+    },
+    email: {
+        color: '#FFFFFF66',
+        fontSize: 16,
+        alignSelf:'center',
+        padding:5,
     },
     userInfo: {
         flexDirection: 'row',
